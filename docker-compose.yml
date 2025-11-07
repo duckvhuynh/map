@@ -45,9 +45,12 @@ services:
       - |
         echo 'Installing osm2pgsql...'
         apt-get update -qq
-        apt-get install -y -qq osm2pgsql wget curl
+        apt-get install -y -qq osm2pgsql wget curl postgresql-client
         echo 'Waiting for PostgreSQL...'
         until pg_isready -h postgres -U $${POSTGRES_USER:-mapuser}; do sleep 2; done
+        echo 'Ensuring hstore extension exists...'
+        psql -h postgres -U $${POSTGRES_USER:-mapuser} -d $${POSTGRES_DB:-mapdb} -c "CREATE EXTENSION IF NOT EXISTS hstore;"
+        psql -h postgres -U $${POSTGRES_USER:-mapuser} -d $${POSTGRES_DB:-mapdb} -c "CREATE EXTENSION IF NOT EXISTS postgis;"
         echo 'Starting OSM import with osm2pgsql...'
         osm2pgsql -d $${POSTGRES_DB:-mapdb} -H postgres -U $${POSTGRES_USER:-mapuser} --create --slim -G --hstore --tag-transform-script /config/openstreetmap-carto.lua -C 2500 --number-processes 2 --style /config/openstreetmap-carto.style /data/osm/vietnam-latest.osm.pbf
         echo 'OSM import completed successfully!'
@@ -87,7 +90,6 @@ services:
     container_name: map-osrm-car
     volumes:
       - ./data/routing/car:/data
-      - ./data/osm:/osm:ro
     ports:
       - "${OSRM_CAR_PORT:-5000}:5000"
     command: osrm-routed --algorithm mld --max-table-size 10000 /data/vietnam-latest.osrm
@@ -106,14 +108,16 @@ services:
     container_name: map-osrm-prepare-car
     volumes:
       - ./data/routing/car:/data
-      - ./data/osm:/osm:ro
+      - ./data/osm:/data/osm:ro
       - ./docker/osrm/car.lua:/profiles/car.lua:ro
-    command: >
-      sh -c "
-        osrm-extract -p /profiles/car.lua /osm/vietnam-latest.osm.pbf -d /data &&
-        osrm-partition /data/vietnam-latest.osrm &&
+    command:
+      - /bin/bash
+      - -c
+      - |
+        cd /data
+        osrm-extract -p /profiles/car.lua /data/osm/vietnam-latest.osm.pbf
+        osrm-partition /data/vietnam-latest.osrm
         osrm-customize /data/vietnam-latest.osrm
-      "
     networks:
       - mapnet
     profiles:
@@ -125,7 +129,6 @@ services:
     container_name: map-osrm-bike
     volumes:
       - ./data/routing/bike:/data
-      - ./data/osm:/osm:ro
     ports:
       - "${OSRM_BIKE_PORT:-5001}:5000"
     command: osrm-routed --algorithm mld --max-table-size 10000 /data/vietnam-latest.osrm
@@ -141,14 +144,16 @@ services:
     container_name: map-osrm-prepare-bike
     volumes:
       - ./data/routing/bike:/data
-      - ./data/osm:/osm:ro
+      - ./data/osm:/data/osm:ro
       - ./docker/osrm/bicycle.lua:/profiles/bicycle.lua:ro
-    command: >
-      sh -c "
-        osrm-extract -p /profiles/bicycle.lua /osm/vietnam-latest.osm.pbf -d /data &&
-        osrm-partition /data/vietnam-latest.osrm &&
+    command:
+      - /bin/bash
+      - -c
+      - |
+        cd /data
+        osrm-extract -p /profiles/bicycle.lua /data/osm/vietnam-latest.osm.pbf
+        osrm-partition /data/vietnam-latest.osrm
         osrm-customize /data/vietnam-latest.osrm
-      "
     networks:
       - mapnet
     profiles:
@@ -160,7 +165,6 @@ services:
     container_name: map-osrm-foot
     volumes:
       - ./data/routing/foot:/data
-      - ./data/osm:/osm:ro
     ports:
       - "${OSRM_FOOT_PORT:-5002}:5000"
     command: osrm-routed --algorithm mld --max-table-size 10000 /data/vietnam-latest.osrm
@@ -176,14 +180,16 @@ services:
     container_name: map-osrm-prepare-foot
     volumes:
       - ./data/routing/foot:/data
-      - ./data/osm:/osm:ro
+      - ./data/osm:/data/osm:ro
       - ./docker/osrm/foot.lua:/profiles/foot.lua:ro
-    command: >
-      sh -c "
-        osrm-extract -p /profiles/foot.lua /osm/vietnam-latest.osm.pbf -d /data &&
-        osrm-partition /data/vietnam-latest.osrm &&
+    command:
+      - /bin/bash
+      - -c
+      - |
+        cd /data
+        osrm-extract -p /profiles/foot.lua /data/osm/vietnam-latest.osm.pbf
+        osrm-partition /data/vietnam-latest.osrm
         osrm-customize /data/vietnam-latest.osrm
-      "
     networks:
       - mapnet
     profiles:
