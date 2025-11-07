@@ -70,8 +70,6 @@ services:
       - ./data/tiles:/data
       - ./docker/tileserver/config.json:/config/config.json
       - ./docker/tileserver/styles:/styles
-    ports:
-      - "${TILESERVER_PORT:-8080}:8080"
     environment:
       - TILESERVER_PORT=8080
     command: --config /config/config.json
@@ -90,8 +88,6 @@ services:
     container_name: map-osrm-car
     volumes:
       - ./data/routing/car:/data
-    ports:
-      - "${OSRM_CAR_PORT:-5000}:5000"
     command: osrm-routed --algorithm mld --max-table-size 10000 /data/vietnam-latest.osrm
     networks:
       - mapnet
@@ -131,8 +127,6 @@ services:
     container_name: map-osrm-bike
     volumes:
       - ./data/routing/bike:/data
-    ports:
-      - "${OSRM_BIKE_PORT:-5001}:5000"
     command: osrm-routed --algorithm mld --max-table-size 10000 /data/vietnam-latest.osrm
     networks:
       - mapnet
@@ -169,8 +163,6 @@ services:
     container_name: map-osrm-foot
     volumes:
       - ./data/routing/foot:/data
-    ports:
-      - "${OSRM_FOOT_PORT:-5002}:5000"
     command: osrm-routed --algorithm mld --max-table-size 10000 /data/vietnam-latest.osrm
     networks:
       - mapnet
@@ -221,8 +213,6 @@ services:
     volumes:
       - nominatim_data:/var/lib/postgresql/14/main
       - ./data/osm:/nominatim/data:ro
-    ports:
-      - "${NOMINATIM_PORT:-7070}:8080"
     networks:
       - mapnet
     restart: unless-stopped
@@ -264,8 +254,6 @@ services:
     container_name: map-martin
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-mapuser}:${POSTGRES_PASSWORD:-mappassword}@postgres:5432/${POSTGRES_DB:-mapdb}
-    ports:
-      - "${MARTIN_PORT:-3001}:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -280,8 +268,6 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: map-frontend
-    ports:
-      - "${FRONTEND_PORT:-3000}:3000"
     environment:
       - NEXT_PUBLIC_TILE_URL=http://localhost:${TILESERVER_PORT:-8080}
       - NEXT_PUBLIC_ROUTING_URL=http://localhost:${OSRM_CAR_PORT:-5000}
