@@ -29,7 +29,9 @@ services:
 
   # Imposm3 - Import OSM data vào PostgreSQL
   import-osm:
-    image: omniscale/imposm3:latest
+    build:
+      context: ./docker/imposm
+      dockerfile: Dockerfile
     container_name: map-import-osm
     volumes:
       - ./data/osm:/data/osm
