@@ -63,7 +63,7 @@ export default function Map() {
         },
         trackUserLocation: true
       }), 'top-left')
-      newMap.addControl(new maplibregl.ScaleControl(), 'bottom-left')
+      newMap.addControl(new maplibregl.ScaleControl({}), 'bottom-left')
       newMap.addControl(new maplibregl.FullscreenControl(), 'top-left')
 
       newMap.on('load', () => {
