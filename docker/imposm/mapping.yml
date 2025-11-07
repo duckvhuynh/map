@@ -1,0 +1,321 @@
+-- Imposm3 mapping for OpenStreetMap data
+-- Optimized for Vietnam map server
+
+tables:
+  # Roads and transportation
+  roads:
+    type: linestring
+    columns:
+    - name: osm_id
+      type: id
+    - name: name
+      type: string
+      key: name
+    - name: name_en
+      type: string
+      key: name:en
+    - name: name_vi
+      type: string
+      key: name:vi
+    - name: highway
+      type: string
+      key: highway
+    - name: surface
+      type: string
+      key: surface
+    - name: lanes
+      type: integer
+      key: lanes
+    - name: oneway
+      type: boolint
+      key: oneway
+    - name: maxspeed
+      type: integer
+      key: maxspeed
+    - name: bridge
+      type: boolint
+      key: bridge
+    - name: tunnel
+      type: boolint
+      key: tunnel
+    - name: ref
+      type: string
+      key: ref
+    - name: type
+      type: string
+    mapping:
+      highway:
+      - motorway
+      - motorway_link
+      - trunk
+      - trunk_link
+      - primary
+      - primary_link
+      - secondary
+      - secondary_link
+      - tertiary
+      - tertiary_link
+      - unclassified
+      - residential
+      - living_street
+      - service
+      - track
+      - path
+      - footway
+      - cycleway
+      - steps
+      - pedestrian
+
+  # Buildings
+  buildings:
+    type: polygon
+    columns:
+    - name: osm_id
+      type: id
+    - name: name
+      type: string
+      key: name
+    - name: building
+      type: string
+      key: building
+    - name: building_levels
+      type: integer
+      key: building:levels
+    - name: height
+      type: string
+      key: height
+    - name: addr_street
+      type: string
+      key: addr:street
+    - name: addr_housenumber
+      type: string
+      key: addr:housenumber
+    - name: type
+      type: string
+    mapping:
+      building:
+      - __any__
+
+  # Points of Interest (POI)
+  pois:
+    type: point
+    columns:
+    - name: osm_id
+      type: id
+    - name: name
+      type: string
+      key: name
+    - name: name_en
+      type: string
+      key: name:en
+    - name: name_vi
+      type: string
+      key: name:vi
+    - name: amenity
+      type: string
+      key: amenity
+    - name: shop
+      type: string
+      key: shop
+    - name: tourism
+      type: string
+      key: tourism
+    - name: leisure
+      type: string
+      key: leisure
+    - name: cuisine
+      type: string
+      key: cuisine
+    - name: type
+      type: string
+    mapping:
+      amenity:
+      - restaurant
+      - cafe
+      - fast_food
+      - bar
+      - pub
+      - bank
+      - atm
+      - hospital
+      - pharmacy
+      - clinic
+      - school
+      - university
+      - library
+      - police
+      - fire_station
+      - post_office
+      - fuel
+      - parking
+      - bicycle_parking
+      - place_of_worship
+      - toilets
+      shop:
+      - __any__
+      tourism:
+      - hotel
+      - motel
+      - hostel
+      - guest_house
+      - attraction
+      - museum
+      - viewpoint
+      leisure:
+      - park
+      - playground
+      - sports_centre
+      - stadium
+
+  # Waterways
+  waterways:
+    type: linestring
+    columns:
+    - name: osm_id
+      type: id
+    - name: name
+      type: string
+      key: name
+    - name: waterway
+      type: string
+      key: waterway
+    - name: width
+      type: string
+      key: width
+    mapping:
+      waterway:
+      - river
+      - stream
+      - canal
+      - drain
+
+  # Water bodies
+  water_areas:
+    type: polygon
+    columns:
+    - name: osm_id
+      type: id
+    - name: name
+      type: string
+      key: name
+    - name: natural
+      type: string
+      key: natural
+    - name: water
+      type: string
+      key: water
+    - name: landuse
+      type: string
+      key: landuse
+    mapping:
+      natural:
+      - water
+      water:
+      - __any__
+      landuse:
+      - reservoir
+      - basin
+
+  # Administrative boundaries
+  admin:
+    type: polygon
+    columns:
+    - name: osm_id
+      type: id
+    - name: name
+      type: string
+      key: name
+    - name: name_en
+      type: string
+      key: name:en
+    - name: name_vi
+      type: string
+      key: name:vi
+    - name: admin_level
+      type: integer
+      key: admin_level
+    - name: boundary
+      type: string
+      key: boundary
+    mapping:
+      boundary:
+      - administrative
+
+  # Landuse
+  landuse:
+    type: polygon
+    columns:
+    - name: osm_id
+      type: id
+    - name: name
+      type: string
+      key: name
+    - name: landuse
+      type: string
+      key: landuse
+    - name: natural
+      type: string
+      key: natural
+    - name: leisure
+      type: string
+      key: leisure
+    mapping:
+      landuse:
+      - residential
+      - commercial
+      - industrial
+      - retail
+      - military
+      - farmland
+      - forest
+      - meadow
+      - grass
+      - orchard
+      - vineyard
+      natural:
+      - wood
+      - scrub
+      - grassland
+      - beach
+      leisure:
+      - park
+      - garden
+      - golf_course
+
+  # Places (cities, towns, villages)
+  places:
+    type: point
+    columns:
+    - name: osm_id
+      type: id
+    - name: name
+      type: string
+      key: name
+    - name: name_en
+      type: string
+      key: name:en
+    - name: name_vi
+      type: string
+      key: name:vi
+    - name: place
+      type: string
+      key: place
+    - name: population
+      type: integer
+      key: population
+    mapping:
+      place:
+      - country
+      - state
+      - city
+      - town
+      - village
+      - hamlet
+      - suburb
+      - neighbourhood
+
+generalized_tables:
+  roads_gen:
+    source: roads
+    tolerance: 50.0
+    sql_filter: highway IN ('motorway', 'trunk', 'primary', 'secondary')

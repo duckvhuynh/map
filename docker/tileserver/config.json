@@ -1,0 +1,39 @@
+{
+  "options": {
+    "paths": {
+      "root": "/data",
+      "fonts": "/fonts",
+      "sprites": "/sprites",
+      "styles": "/styles",
+      "mbtiles": "/data"
+    },
+    "domains": ["*"],
+    "formatQuality": {
+      "jpeg": 80,
+      "webp": 90
+    },
+    "maxSize": 2048,
+    "pbfAlias": "pbf"
+  },
+  "styles": {
+    "basic": {
+      "style": "basic-preview.json",
+      "tilejson": {
+        "type": "overlay",
+        "bounds": [102.14, 8.18, 109.46, 23.39]
+      }
+    },
+    "osm-bright": {
+      "style": "osm-bright.json",
+      "tilejson": {
+        "type": "overlay",
+        "bounds": [102.14, 8.18, 109.46, 23.39]
+      }
+    }
+  },
+  "data": {
+    "vietnam": {
+      "mbtiles": "vietnam.mbtiles"
+    }
+  }
+}

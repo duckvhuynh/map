@@ -1,0 +1,347 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with PostGIS - Database chính
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: map-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mapdb}
+      POSTGRES_USER: ${POSTGRES_USER:-mapuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mappassword}
+      POSTGRES_SHARED_BUFFERS: ${POSTGRES_SHARED_BUFFERS:-2GB}
+      POSTGRES_WORK_MEM: ${POSTGRES_WORK_MEM:-256MB}
+      POSTGRES_MAINTENANCE_WORK_MEM: ${POSTGRES_MAINTENANCE_WORK_MEM:-1GB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./data/osm:/data/osm
+      - ./docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    networks:
+      - mapnet
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mapuser}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Imposm3 - Import OSM data vào PostgreSQL
+  import-osm:
+    image: openmaptiles/imposm3:latest
+    container_name: map-import-osm
+    volumes:
+      - ./data/osm:/data/osm
+      - ./docker/imposm:/config
+      - imposm_cache:/cache
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-mapdb}
+      POSTGRES_USER: ${POSTGRES_USER:-mapuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mappassword}
+    command: >
+      sh -c "
+        echo 'Waiting for PostgreSQL...' &&
+        sleep 10 &&
+        imposm import 
+          -connection postgis://${POSTGRES_USER:-mapuser}:${POSTGRES_PASSWORD:-mappassword}@postgres/${POSTGRES_DB:-mapdb}
+          -mapping /config/mapping.yml
+          -read /data/osm/vietnam-latest.osm.pbf
+          -write
+          -diff
+          -cachedir /cache
+          -overwritecache &&
+        imposm import
+          -connection postgis://${POSTGRES_USER:-mapuser}:${POSTGRES_PASSWORD:-mappassword}@postgres/${POSTGRES_DB:-mapdb}
+          -mapping /config/mapping.yml
+          -deployproduction
+          -cachedir /cache
+      "
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - mapnet
+    profiles:
+      - import
+
+  # Tile Server GL - Phục vụ vector tiles
+  tileserver:
+    image: maptiler/tileserver-gl:latest
+    container_name: map-tileserver
+    volumes:
+      - ./data/tiles:/data
+      - ./docker/tileserver/config.json:/config/config.json
+      - ./docker/tileserver/styles:/styles
+    ports:
+      - "${TILESERVER_PORT:-8080}:8080"
+    environment:
+      - TILESERVER_PORT=8080
+    command: --config /config/config.json
+    networks:
+      - mapnet
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # OSRM Backend - Routing engine
+  osrm-car:
+    image: osrm/osrm-backend:latest
+    container_name: map-osrm-car
+    volumes:
+      - ./data/routing/car:/data
+      - ./data/osm:/osm:ro
+    ports:
+      - "${OSRM_CAR_PORT:-5000}:5000"
+    command: osrm-routed --algorithm mld --max-table-size 10000 /data/vietnam-latest.osrm
+    networks:
+      - mapnet
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # OSRM Prepare Data for Car
+  osrm-prepare-car:
+    image: osrm/osrm-backend:latest
+    container_name: map-osrm-prepare-car
+    volumes:
+      - ./data/routing/car:/data
+      - ./data/osm:/osm:ro
+      - ./docker/osrm/car.lua:/profiles/car.lua:ro
+    command: >
+      sh -c "
+        osrm-extract -p /profiles/car.lua /osm/vietnam-latest.osm.pbf -d /data &&
+        osrm-partition /data/vietnam-latest.osrm &&
+        osrm-customize /data/vietnam-latest.osrm
+      "
+    networks:
+      - mapnet
+    profiles:
+      - import
+
+  # OSRM Bike
+  osrm-bike:
+    image: osrm/osrm-backend:latest
+    container_name: map-osrm-bike
+    volumes:
+      - ./data/routing/bike:/data
+      - ./data/osm:/osm:ro
+    ports:
+      - "${OSRM_BIKE_PORT:-5001}:5000"
+    command: osrm-routed --algorithm mld --max-table-size 10000 /data/vietnam-latest.osrm
+    networks:
+      - mapnet
+    restart: unless-stopped
+    profiles:
+      - full
+
+  # OSRM Prepare Data for Bike
+  osrm-prepare-bike:
+    image: osrm/osrm-backend:latest
+    container_name: map-osrm-prepare-bike
+    volumes:
+      - ./data/routing/bike:/data
+      - ./data/osm:/osm:ro
+      - ./docker/osrm/bicycle.lua:/profiles/bicycle.lua:ro
+    command: >
+      sh -c "
+        osrm-extract -p /profiles/bicycle.lua /osm/vietnam-latest.osm.pbf -d /data &&
+        osrm-partition /data/vietnam-latest.osrm &&
+        osrm-customize /data/vietnam-latest.osrm
+      "
+    networks:
+      - mapnet
+    profiles:
+      - import
+
+  # OSRM Foot
+  osrm-foot:
+    image: osrm/osrm-backend:latest
+    container_name: map-osrm-foot
+    volumes:
+      - ./data/routing/foot:/data
+      - ./data/osm:/osm:ro
+    ports:
+      - "${OSRM_FOOT_PORT:-5002}:5000"
+    command: osrm-routed --algorithm mld --max-table-size 10000 /data/vietnam-latest.osrm
+    networks:
+      - mapnet
+    restart: unless-stopped
+    profiles:
+      - full
+
+  # OSRM Prepare Data for Foot
+  osrm-prepare-foot:
+    image: osrm/osrm-backend:latest
+    container_name: map-osrm-prepare-foot
+    volumes:
+      - ./data/routing/foot:/data
+      - ./data/osm:/osm:ro
+      - ./docker/osrm/foot.lua:/profiles/foot.lua:ro
+    command: >
+      sh -c "
+        osrm-extract -p /profiles/foot.lua /osm/vietnam-latest.osm.pbf -d /data &&
+        osrm-partition /data/vietnam-latest.osrm &&
+        osrm-customize /data/vietnam-latest.osrm
+      "
+    networks:
+      - mapnet
+    profiles:
+      - import
+
+  # Nominatim - Geocoding service
+  nominatim:
+    image: mediagis/nominatim:4.4
+    container_name: map-nominatim
+    environment:
+      PBF_URL: file:///nominatim/data/vietnam-latest.osm.pbf
+      REPLICATION_URL: https://download.geofabrik.de/asia/vietnam-updates/
+      IMPORT_WIKIPEDIA: "false"
+      IMPORT_US_POSTCODES: "false"
+      IMPORT_GB_POSTCODES: "false"
+      NOMINATIM_PASSWORD: ${POSTGRES_PASSWORD:-mappassword}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-mapdb}
+      POSTGRES_USER: ${POSTGRES_USER:-mapuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mappassword}
+      THREADS: ${NOMINATIM_THREADS:-4}
+    volumes:
+      - nominatim_data:/var/lib/postgresql/14/main
+      - ./data/osm:/nominatim/data:ro
+    ports:
+      - "${NOMINATIM_PORT:-7070}:8080"
+    networks:
+      - mapnet
+    restart: unless-stopped
+    shm_size: 1gb
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Import Nominatim data
+  import-nominatim:
+    image: mediagis/nominatim:4.4
+    container_name: map-import-nominatim
+    environment:
+      PBF_URL: file:///nominatim/data/vietnam-latest.osm.pbf
+      REPLICATION_URL: https://download.geofabrik.de/asia/vietnam-updates/
+      IMPORT_WIKIPEDIA: "false"
+      NOMINATIM_PASSWORD: ${POSTGRES_PASSWORD:-mappassword}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: nominatim
+      POSTGRES_USER: ${POSTGRES_USER:-mapuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mappassword}
+      THREADS: ${NOMINATIM_THREADS:-4}
+    volumes:
+      - nominatim_data:/var/lib/postgresql/14/main
+      - ./data/osm:/nominatim/data:ro
+    networks:
+      - mapnet
+    shm_size: 1gb
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - import
+
+  # Martin - PostGIS vector tiles server (alternative to tileserver-gl)
+  martin:
+    image: ghcr.io/maplibre/martin:latest
+    container_name: map-martin
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-mapuser}:${POSTGRES_PASSWORD:-mappassword}@postgres:5432/${POSTGRES_DB:-mapdb}
+    ports:
+      - "${MARTIN_PORT:-3001}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - mapnet
+    restart: unless-stopped
+    command: --default-srid 4326
+
+  # Frontend - Web application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: map-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - NEXT_PUBLIC_TILE_URL=http://localhost:${TILESERVER_PORT:-8080}
+      - NEXT_PUBLIC_ROUTING_URL=http://localhost:${OSRM_CAR_PORT:-5000}
+      - NEXT_PUBLIC_GEOCODING_URL=http://localhost:${NOMINATIM_PORT:-7070}
+      - NEXT_PUBLIC_API_URL=http://localhost:${NGINX_PORT:-80}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - mapnet
+    restart: unless-stopped
+    depends_on:
+      - tileserver
+      - osrm-car
+      - nominatim
+
+  # Nginx - Reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: map-nginx
+    ports:
+      - "${NGINX_PORT:-80}:80"
+      - "${NGINX_SSL_PORT:-443}:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./docker/nginx/ssl:/etc/nginx/ssl:ro
+      - ./data/tiles:/usr/share/nginx/html/tiles:ro
+    depends_on:
+      - tileserver
+      - osrm-car
+      - nominatim
+      - frontend
+    networks:
+      - mapnet
+    restart: unless-stopped
+
+  # Redis - Cache (optional, for production)
+  redis:
+    image: redis:7-alpine
+    container_name: map-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mapnet
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    profiles:
+      - full
+
+volumes:
+  postgres_data:
+    driver: local
+  nominatim_data:
+    driver: local
+  imposm_cache:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  mapnet:
+    driver: bridge
