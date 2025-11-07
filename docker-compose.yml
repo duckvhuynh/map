@@ -108,16 +108,18 @@ services:
     container_name: map-osrm-prepare-car
     volumes:
       - ./data/routing/car:/data
-      - ./data/osm:/data/osm:ro
+      - ./data/osm:/osm:ro
       - ./docker/osrm/car.lua:/profiles/car.lua:ro
     command:
       - /bin/bash
       - -c
       - |
+        cp /osm/vietnam-latest.osm.pbf /data/
         cd /data
-        osrm-extract -p /profiles/car.lua /data/osm/vietnam-latest.osm.pbf
-        osrm-partition /data/vietnam-latest.osrm
-        osrm-customize /data/vietnam-latest.osrm
+        osrm-extract -p /profiles/car.lua vietnam-latest.osm.pbf
+        osrm-partition vietnam-latest.osrm
+        osrm-customize vietnam-latest.osrm
+        rm vietnam-latest.osm.pbf
     networks:
       - mapnet
     profiles:
@@ -144,16 +146,18 @@ services:
     container_name: map-osrm-prepare-bike
     volumes:
       - ./data/routing/bike:/data
-      - ./data/osm:/data/osm:ro
+      - ./data/osm:/osm:ro
       - ./docker/osrm/bicycle.lua:/profiles/bicycle.lua:ro
     command:
       - /bin/bash
       - -c
       - |
+        cp /osm/vietnam-latest.osm.pbf /data/
         cd /data
-        osrm-extract -p /profiles/bicycle.lua /data/osm/vietnam-latest.osm.pbf
-        osrm-partition /data/vietnam-latest.osrm
-        osrm-customize /data/vietnam-latest.osrm
+        osrm-extract -p /profiles/bicycle.lua vietnam-latest.osm.pbf
+        osrm-partition vietnam-latest.osrm
+        osrm-customize vietnam-latest.osrm
+        rm vietnam-latest.osm.pbf
     networks:
       - mapnet
     profiles:
@@ -180,16 +184,18 @@ services:
     container_name: map-osrm-prepare-foot
     volumes:
       - ./data/routing/foot:/data
-      - ./data/osm:/data/osm:ro
+      - ./data/osm:/osm:ro
       - ./docker/osrm/foot.lua:/profiles/foot.lua:ro
     command:
       - /bin/bash
       - -c
       - |
+        cp /osm/vietnam-latest.osm.pbf /data/
         cd /data
-        osrm-extract -p /profiles/foot.lua /data/osm/vietnam-latest.osm.pbf
-        osrm-partition /data/vietnam-latest.osrm
-        osrm-customize /data/vietnam-latest.osrm
+        osrm-extract -p /profiles/foot.lua vietnam-latest.osm.pbf
+        osrm-partition vietnam-latest.osrm
+        osrm-customize vietnam-latest.osrm
+        rm vietnam-latest.osm.pbf
     networks:
       - mapnet
     profiles:
