@@ -70,6 +70,8 @@ services:
       - ./data/tiles:/data
       - ./docker/tileserver/config.json:/config/config.json
       - ./docker/tileserver/styles:/styles
+    ports:
+      - "127.0.0.1:8080:8080"
     environment:
       - TILESERVER_PORT=8080
     command: --config /config/config.json
@@ -88,6 +90,8 @@ services:
     container_name: map-osrm-car
     volumes:
       - ./data/routing/car:/data
+    ports:
+      - "127.0.0.1:5000:5000"
     command: osrm-routed --algorithm mld --max-table-size 10000 /data/vietnam-latest.osrm
     networks:
       - mapnet
@@ -127,6 +131,8 @@ services:
     container_name: map-osrm-bike
     volumes:
       - ./data/routing/bike:/data
+    ports:
+      - "127.0.0.1:5001:5000"
     command: osrm-routed --algorithm mld --max-table-size 10000 /data/vietnam-latest.osrm
     networks:
       - mapnet
@@ -163,6 +169,8 @@ services:
     container_name: map-osrm-foot
     volumes:
       - ./data/routing/foot:/data
+    ports:
+      - "127.0.0.1:5002:5000"
     command: osrm-routed --algorithm mld --max-table-size 10000 /data/vietnam-latest.osrm
     networks:
       - mapnet
@@ -213,6 +221,8 @@ services:
     volumes:
       - nominatim_data:/var/lib/postgresql/14/main
       - ./data/osm:/nominatim/data:ro
+    ports:
+      - "127.0.0.1:7070:8080"
     networks:
       - mapnet
     restart: unless-stopped
@@ -254,6 +264,8 @@ services:
     container_name: map-martin
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-mapuser}:${POSTGRES_PASSWORD:-mappassword}@postgres:5432/${POSTGRES_DB:-mapdb}
+    ports:
+      - "127.0.0.1:3001:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -268,6 +280,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: map-frontend
+    ports:
+      - "127.0.0.1:3000:3000"
     environment:
       - NEXT_PUBLIC_TILE_URL=http://localhost:${TILESERVER_PORT:-8080}
       - NEXT_PUBLIC_ROUTING_URL=http://localhost:${OSRM_CAR_PORT:-5000}
@@ -285,26 +299,8 @@ services:
       - osrm-car
       - nominatim
 
-  # Nginx - Reverse proxy
-  nginx:
-    image: nginx:alpine
-    container_name: map-nginx
-    ports:
-      - "${NGINX_PORT:-80}:80"
-      - "${NGINX_SSL_PORT:-443}:443"
-    volumes:
-      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./docker/nginx/ssl:/etc/nginx/ssl:ro
-      - ./data/tiles:/usr/share/nginx/html/tiles:ro
-    depends_on:
-      - tileserver
-      - osrm-car
-      - nominatim
-      - frontend
-    networks:
-      - mapnet
-    restart: unless-stopped
+  # Note: Nginx container removed - using host system Nginx instead
+  # The host Nginx will proxy to services via Docker network
 
   # Redis - Cache (optional, for production)
   redis:
