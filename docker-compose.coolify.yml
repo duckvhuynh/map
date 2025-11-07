@@ -1,0 +1,243 @@
+# Docker Compose for Coolify Deployment
+# Vietnam Map Server - Complete Self-Hosted Map System
+# Domain: map.duckvhuynh.space
+
+services:
+  # PostgreSQL with PostGIS - Main spatial database
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: map-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mapdb}
+      POSTGRES_USER: ${POSTGRES_USER:-mapuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_SHARED_BUFFERS: ${POSTGRES_SHARED_BUFFERS:-2GB}
+      POSTGRES_WORK_MEM: ${POSTGRES_WORK_MEM:-256MB}
+      POSTGRES_MAINTENANCE_WORK_MEM: ${POSTGRES_MAINTENANCE_WORK_MEM:-1GB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./data/osm:/data/osm
+      - ./docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    networks:
+      - mapnet
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mapuser}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "coolify.managed=true"
+
+  # Tile Server GL - Serves raster map tiles
+  tileserver:
+    image: maptiler/tileserver-gl:latest
+    container_name: map-tileserver
+    volumes:
+      - ./data/tiles:/data
+      - ./docker/tileserver/config.json:/config/config.json
+      - ./docker/tileserver/styles:/styles
+    environment:
+      - TILESERVER_PORT=8080
+    command: --config /config/config.json
+    networks:
+      - mapnet
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "coolify.managed=true"
+
+  # OSRM Car - Routing engine for cars
+  osrm-car:
+    image: osrm/osrm-backend:latest
+    container_name: map-osrm-car
+    volumes:
+      - ./data/routing/car:/data
+    command: osrm-routed --algorithm mld --max-table-size 10000 /data/vietnam-latest.osrm
+    networks:
+      - mapnet
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "coolify.managed=true"
+
+  # OSRM Bike - Routing engine for bicycles
+  osrm-bike:
+    image: osrm/osrm-backend:latest
+    container_name: map-osrm-bike
+    volumes:
+      - ./data/routing/bike:/data
+    command: osrm-routed --algorithm mld --max-table-size 10000 /data/vietnam-latest.osrm
+    networks:
+      - mapnet
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "coolify.managed=true"
+
+  # OSRM Foot - Routing engine for pedestrians
+  osrm-foot:
+    image: osrm/osrm-backend:latest
+    container_name: map-osrm-foot
+    volumes:
+      - ./data/routing/foot:/data
+    command: osrm-routed --algorithm mld --max-table-size 10000 /data/vietnam-latest.osrm
+    networks:
+      - mapnet
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "coolify.managed=true"
+
+  # Nominatim - Geocoding and reverse geocoding service
+  nominatim:
+    image: mediagis/nominatim:4.4
+    container_name: map-nominatim
+    environment:
+      PBF_URL: file:///nominatim/data/vietnam-latest.osm.pbf
+      REPLICATION_URL: https://download.geofabrik.de/asia/vietnam-updates/
+      IMPORT_WIKIPEDIA: "false"
+      IMPORT_US_POSTCODES: "false"
+      IMPORT_GB_POSTCODES: "false"
+      NOMINATIM_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-mapdb}
+      POSTGRES_USER: ${POSTGRES_USER:-mapuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      THREADS: ${NOMINATIM_THREADS:-4}
+    volumes:
+      - nominatim_data:/var/lib/postgresql/14/main
+      - ./data/osm:/nominatim/data:ro
+    networks:
+      - mapnet
+    restart: unless-stopped
+    shm_size: 1gb
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 300s
+    labels:
+      - "coolify.managed=true"
+
+  # Martin - PostGIS vector tiles server
+  martin:
+    image: ghcr.io/maplibre/martin:latest
+    container_name: map-martin
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-mapuser}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mapdb}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - mapnet
+    restart: unless-stopped
+    command: --default-srid 4326
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "coolify.managed=true"
+
+  # Redis - Cache for production
+  redis:
+    image: redis:7-alpine
+    container_name: map-redis
+    volumes:
+      - redis_data:/data
+    networks:
+      - mapnet
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    labels:
+      - "coolify.managed=true"
+
+  # Frontend - Next.js web application (main entry point)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: map-frontend
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_TILE_URL=/tiles
+      - NEXT_PUBLIC_ROUTING_URL=/route
+      - NEXT_PUBLIC_GEOCODING_URL=/geocode
+      - NEXT_PUBLIC_API_URL=${APP_URL}
+    networks:
+      - mapnet
+      - coolify
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      tileserver:
+        condition: service_started
+      osrm-car:
+        condition: service_started
+      nominatim:
+        condition: service_started
+      martin:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "coolify.managed=true"
+      - "traefik.enable=true"
+      - "traefik.http.routers.map-frontend.rule=Host(`${APP_DOMAIN}`)"
+      - "traefik.http.routers.map-frontend.entrypoints=websecure"
+      - "traefik.http.routers.map-frontend.tls=true"
+      - "traefik.http.routers.map-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.map-frontend.loadbalancer.server.port=3000"
+      - "traefik.docker.network=coolify"
+      # Health check path for Coolify monitoring
+      - "coolify.healthcheck.path=/api/health"
+      - "coolify.healthcheck.port=3000"
+
+volumes:
+  postgres_data:
+    driver: local
+  nominatim_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  mapnet:
+    driver: bridge
+  coolify:
+    external: true

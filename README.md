@@ -2,6 +2,9 @@
 
 Một hệ thống tile server hoàn chỉnh với đầy đủ tính năng routing, geocoding, matrix, isochrone sử dụng dữ liệu OpenStreetMap cho Việt Nam.
 
+[![Deploy on Coolify](https://img.shields.io/badge/Deploy%20on-Coolify-6B7FFF?style=for-the-badge&logo=docker)](./COOLIFY_DEPLOY.md)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker)](./docker-compose.yml)
+
 ## 🚀 Tính năng
 
 - ✅ **Tile Server**: Phục vụ map tiles vector/raster
