@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL with PostGIS - Database chính
   postgres:
@@ -31,7 +29,7 @@ services:
 
   # Imposm3 - Import OSM data vào PostgreSQL
   import-osm:
-    image: openmaptiles/imposm3:latest
+    image: omniscale/imposm3:latest
     container_name: map-import-osm
     volumes:
       - ./data/osm:/data/osm
