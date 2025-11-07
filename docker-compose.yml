@@ -39,25 +39,18 @@ services:
       PGDATABASE: ${POSTGRES_DB:-mapdb}
       PGUSER: ${POSTGRES_USER:-mapuser}
       PGPASSWORD: ${POSTGRES_PASSWORD:-mappassword}
-    command: >
-      sh -c "
-        echo 'Installing osm2pgsql...' &&
-        apt-get update -qq &&
-        apt-get install -y -qq osm2pgsql wget curl &&
-        echo 'Waiting for PostgreSQL...' &&
-        until pg_isready -h postgres -U ${POSTGRES_USER:-mapuser}; do sleep 2; done &&
-        echo 'Starting OSM import with osm2pgsql...' &&
-        osm2pgsql -d ${POSTGRES_DB:-mapdb} \
-          -H postgres \
-          -U ${POSTGRES_USER:-mapuser} \
-          --create --slim -G --hstore \
-          --tag-transform-script /config/openstreetmap-carto.lua \
-          -C 2500 \
-          --number-processes 2 \
-          --style /config/openstreetmap-carto.style \
-          /data/osm/vietnam-latest.osm.pbf &&
+    command:
+      - /bin/bash
+      - -c
+      - |
+        echo 'Installing osm2pgsql...'
+        apt-get update -qq
+        apt-get install -y -qq osm2pgsql wget curl
+        echo 'Waiting for PostgreSQL...'
+        until pg_isready -h postgres -U $${POSTGRES_USER:-mapuser}; do sleep 2; done
+        echo 'Starting OSM import with osm2pgsql...'
+        osm2pgsql -d $${POSTGRES_DB:-mapdb} -H postgres -U $${POSTGRES_USER:-mapuser} --create --slim -G --hstore --tag-transform-script /config/openstreetmap-carto.lua -C 2500 --number-processes 2 --style /config/openstreetmap-carto.style /data/osm/vietnam-latest.osm.pbf
         echo 'OSM import completed successfully!'
-      "
     depends_on:
       postgres:
         condition: service_healthy
