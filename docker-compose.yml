@@ -27,38 +27,36 @@ services:
       timeout: 5s
       retries: 5
 
-  # Imposm3 - Import OSM data vào PostgreSQL
+  # Import OSM data using osm2pgsql (standard method)
   import-osm:
-    build:
-      context: ./docker/imposm
-      dockerfile: Dockerfile
+    image: postgis/postgis:15-3.3
     container_name: map-import-osm
     volumes:
       - ./data/osm:/data/osm
       - ./docker/imposm:/config
-      - imposm_cache:/cache
     environment:
-      POSTGRES_HOST: postgres
-      POSTGRES_DB: ${POSTGRES_DB:-mapdb}
-      POSTGRES_USER: ${POSTGRES_USER:-mapuser}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mappassword}
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:-mapdb}
+      PGUSER: ${POSTGRES_USER:-mapuser}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-mappassword}
     command: >
       sh -c "
+        echo 'Installing osm2pgsql...' &&
+        apt-get update -qq &&
+        apt-get install -y -qq osm2pgsql wget curl &&
         echo 'Waiting for PostgreSQL...' &&
-        sleep 10 &&
-        imposm import 
-          -connection postgis://${POSTGRES_USER:-mapuser}:${POSTGRES_PASSWORD:-mappassword}@postgres/${POSTGRES_DB:-mapdb}
-          -mapping /config/mapping.yml
-          -read /data/osm/vietnam-latest.osm.pbf
-          -write
-          -diff
-          -cachedir /cache
-          -overwritecache &&
-        imposm import
-          -connection postgis://${POSTGRES_USER:-mapuser}:${POSTGRES_PASSWORD:-mappassword}@postgres/${POSTGRES_DB:-mapdb}
-          -mapping /config/mapping.yml
-          -deployproduction
-          -cachedir /cache
+        until pg_isready -h postgres -U ${POSTGRES_USER:-mapuser}; do sleep 2; done &&
+        echo 'Starting OSM import with osm2pgsql...' &&
+        osm2pgsql -d ${POSTGRES_DB:-mapdb} \
+          -H postgres \
+          -U ${POSTGRES_USER:-mapuser} \
+          --create --slim -G --hstore \
+          --tag-transform-script /config/openstreetmap-carto.lua \
+          -C 2500 \
+          --number-processes 2 \
+          --style /config/openstreetmap-carto.style \
+          /data/osm/vietnam-latest.osm.pbf &&
+        echo 'OSM import completed successfully!'
       "
     depends_on:
       postgres:
