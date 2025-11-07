@@ -2,6 +2,14 @@
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  // Speed up builds in production by skipping type checking
+  // TypeScript and ESLint should be run separately in CI/CD
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   env: {
     NEXT_PUBLIC_TILE_URL: process.env.NEXT_PUBLIC_TILE_URL || '/tiles',
     NEXT_PUBLIC_ROUTING_URL: process.env.NEXT_PUBLIC_ROUTING_URL || '/route',

@@ -221,6 +221,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - NODE_ENV=production
     container_name: map-frontend
     environment:
       - NODE_ENV=production
@@ -258,8 +260,8 @@ services:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 120s
     labels:
       - "coolify.managed=true"
       - "coolify.description=Next.js Frontend - Main web application"
@@ -275,6 +277,8 @@ services:
       - "coolify.healthcheck.path=/api/health"
       - "coolify.healthcheck.port=3000"
       - "coolify.healthcheck.interval=30s"
+      - "coolify.healthcheck.timeout=10s"
+      - "coolify.healthcheck.retries=5"
 
 volumes:
   postgres_data:

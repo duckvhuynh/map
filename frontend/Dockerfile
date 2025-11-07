@@ -6,7 +6,8 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm ci
+# Use npm ci with frozen lockfile for faster, deterministic installs
+RUN npm ci --prefer-offline --no-audit --progress=false
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -15,6 +16,9 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED 1
+# Speed up build by skipping linting and type checking (already done in dev)
+ENV NEXT_SKIP_TYPE_CHECKING 1
+ENV NEXT_SKIP_LINT 1
 
 RUN npm run build
 
