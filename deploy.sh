@@ -253,11 +253,11 @@ sudo tee "$NGINX_CONFIG" > /dev/null <<'NGINX_EOF'
 # Domain: map.duckvhuynh.space
 
 upstream map_frontend {
-    server localhost:3001;
+    server localhost:3000;
 }
 
 upstream map_tileserver {
-    server localhost:8080;
+    server localhost:8081;
 }
 
 upstream map_nominatim {

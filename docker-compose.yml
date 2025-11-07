@@ -71,7 +71,7 @@ services:
       - ./docker/tileserver/config.json:/config/config.json
       - ./docker/tileserver/styles:/styles
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8081:8080"
     environment:
       - TILESERVER_PORT=8080
     command: --config /config/config.json
@@ -109,7 +109,7 @@ services:
     volumes:
       - ./data/routing/car:/data
       - ./data/osm:/osm:ro
-      - ./docker/osrm/car.lua:/profiles/car.lua:ro
+      - ./docker/osrm:/profiles:ro
     command:
       - /bin/bash
       - -c
@@ -147,7 +147,7 @@ services:
     volumes:
       - ./data/routing/bike:/data
       - ./data/osm:/osm:ro
-      - ./docker/osrm/bicycle.lua:/profiles/bicycle.lua:ro
+      - ./docker/osrm:/profiles:ro
     command:
       - /bin/bash
       - -c
@@ -185,7 +185,7 @@ services:
     volumes:
       - ./data/routing/foot:/data
       - ./data/osm:/osm:ro
-      - ./docker/osrm/foot.lua:/profiles/foot.lua:ro
+      - ./docker/osrm:/profiles:ro
     command:
       - /bin/bash
       - -c
